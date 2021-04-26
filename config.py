@@ -4,8 +4,9 @@ import os
 
 
 class Config:
-    def __init__(self):
+    def __init__(self, config_file):
         self.source_path = ""
+        self.source_skip_files = ""
         self.target_photo_path = ""
         self.target_video_path = ""
         self.photo_files = ""
@@ -17,6 +18,7 @@ class Config:
         self.proceed_on_error = False
         self.execute = False
         self.move_or_copy = ""
+        self.config_file = config_file
 
     def load(self):
         # Load and validate config
@@ -27,10 +29,12 @@ class Config:
         try:
             # Parse the config file
             config = configparser.RawConfigParser()
-            config.read('config.ini')
+            config.read(self.config_file)
 
             # Source and Target
             self.source_path = config.get("Source", "source_path")
+            source_skip_files_text = config.get("Source", "skip_files")
+            self.source_skip_files = source_skip_files_text.split(",")
             self.target_photo_path = config.get("Target", "photo_path")
             self.target_video_path = config.get("Target", "video_path")
 
@@ -91,5 +95,5 @@ class Config:
         # Check for source exists
         if not os.path.exists(self.source_path):
             error_text = f"Folder path does not exist. {self.source_path}"
-
+            result = False
         return result, error_text
