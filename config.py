@@ -1,9 +1,15 @@
+"""Manages loading, parsing and validation of configuration from file"""
 import configparser
 from configparser import NoSectionError, NoOptionError
 import os
+from distutils.util import strtobool
 
 
 class Config:
+    """Configuration file management class"""
+
+    # pylint: disable=too-many-instance-attributes
+    # This is a reasonable use of attributes
     def __init__(self, config_file):
         self.source_path = ""
         self.source_skip_files = ""
@@ -21,10 +27,7 @@ class Config:
         self.config_file = config_file
 
     def load(self):
-        # Load and validate config
-
-        result = True
-        error_text = ""
+        """Load and validate the configuration from file"""
 
         try:
             # Parse the config file
@@ -33,48 +36,19 @@ class Config:
 
             # Source and Target
             self.source_path = config.get("Source", "source_path")
-            source_skip_files_text = config.get("Source", "skip_files")
-            self.source_skip_files = source_skip_files_text.split(",")
+            self.source_skip_files = config.get("Source", "skip_files").lower().split(",")
+            self.photo_files = config.get("Source", "photo_files").lower().split(",")
+            self.video_files = config.get("Source", "video_files").lower().split(",")
             self.target_photo_path = config.get("Target", "photo_path")
             self.target_video_path = config.get("Target", "video_path")
 
             # Options
-            if config.get("Options", "use_year").upper() == "Y":
-                self.use_year = True
-            else:
-                self.use_year = False
-
-            if config.get("Options", "use_month").upper() == "Y":
-                self.use_month = True
-            else:
-                self.use_month = False
-
-            if config.get("Options", "use_day").upper() == "Y":
-                self.use_day = True
-            else:
-                self.use_day = False
-
-            if config.get("Options", "use_month_name").upper() == "Y":
-                self.use_month_name = True
-            else:
-                self.use_month_name = False
-
-            if config.get("Options", "proceed_on_error").upper() == "Y":
-                self.proceed_on_error = True
-            else:
-                self.proceed_on_error = False
-
-            if config.get("Options", "execute").upper() == "Y":
-                self.execute = True
-            else:
-                self.execute = False
-
-            photo_files_text = config.get("Source", "photo_files").lower()
-            self.photo_files = photo_files_text.split(",")
-
-            video_files_text = config.get("Source", "video_files").lower()
-            self.video_files = video_files_text.split(",")
-
+            self.use_year = strtobool(val=config.get("Options", "use_year"))
+            self.use_month = strtobool(val=config.get("Options", "use_month"))
+            self.use_day = strtobool(val=config.get("Options", "use_day"))
+            self.use_month_name = strtobool(val=config.get("Options", "use_month_name"))
+            self.proceed_on_error = strtobool(val=config.get("Options", "proceed_on_error"))
+            self.execute = strtobool(val=config.get("Options", "execute"))
             self.move_or_copy = config.get("Options", "move_or_copy").lower()
 
             # Validate config
@@ -82,13 +56,16 @@ class Config:
 
             return result, error_text
         except NoSectionError as no_section_exception:
-            error_text = f"Could not open the config file\nError Description: {no_section_exception.message}."
+            error_text = f"Could not open the config file\n" \
+                         f"Error Description: {no_section_exception.message}."
             return False, error_text
         except NoOptionError as no_option_error:
-            error_text = f"Configuration file is incorrect.\nError Description: {no_option_error.message}."
+            error_text = f"Configuration file is incorrect.\n" \
+                         f"Error Description: {no_option_error.message}."
             return False, error_text
 
     def validate_config(self):
+        """Validate the configuration content"""
         result = True
         error_text = ""
 
