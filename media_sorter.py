@@ -5,10 +5,12 @@ import datetime
 import calendar
 from os import path
 import logging
+from exif import Image
 
 
 class MediaSorter:
     """Main MediaSorter class"""
+
     def __init__(self, config):
         self.config = config
         self.photo_file_count = 0
@@ -34,6 +36,7 @@ class MediaSorter:
         """Decide whether or not to skip a file"""
         source_file_size = folder_item.stat().st_size
         filename, source_file_extension = os.path.splitext(folder_item.path)
+        source_file_extension = source_file_extension.lower()
         if source_file_size <= 0:
             skip = True
             skip_reason = "Zero file size"
@@ -61,6 +64,7 @@ class MediaSorter:
         source_file_name = folder_item.name
         source_file_path = folder_item.path
         file_name, source_file_extension = os.path.splitext(source_file_path)
+        source_file_extension = source_file_extension.lower()
         self.logger.debug(f"Found file: {source_file_path}")
 
         # Do we need to skip the file?
@@ -80,14 +84,16 @@ class MediaSorter:
             file_type = "video"
         else:
             # Something horrible has happened here
-            self.logger.debug(f"Something has gone wrong processing: {file_name}. Reason: Can't determine file type")
+            self.logger.debug(f"Something has gone wrong processing: {file_name}. "
+                              f"Reason: Can't determine file type: {source_file_extension}")
             return
 
-        created_date = datetime.datetime.fromtimestamp(folder_item.stat().st_ctime)
-        self.logger.debug(f"Created date of file is: {created_date}")
+        item_date = self.get_item_date(folder_item, file_type)
+        #
+        self.logger.debug(f"Using Date: {item_date}")
 
         # Create or check target folders
-        base_folder = self.create_base_folder(target_path=target_path, date=created_date)
+        base_folder = self.create_base_folder(target_path=target_path, date=item_date)
 
         # Move or copy file
         target_file_name_path = f"{base_folder}\\{source_file_name}"
@@ -122,7 +128,9 @@ class MediaSorter:
         year_folder = f"{target_path}\\{year_text}"
         self.create_folder(year_folder)
 
-        if self.config.use_month:
+        if not self.config.use_month:
+            return year_folder
+        else:
             if self.config.use_month_name:
                 month_text = calendar.month_name[month]
             else:
@@ -133,8 +141,6 @@ class MediaSorter:
             month_folder = f"{target_path}\\{year_text}\\{month_text}"
             self.create_folder(folder_path=month_folder)
             return month_folder
-        else:
-            return year_folder
 
     def process_folder(self, folder_path):
         """Parse the specified folder"""
@@ -153,3 +159,31 @@ class MediaSorter:
                 result = self.process_folder(folder_item.path)
 
         return result
+
+    def get_item_date(self, folder_item, file_type):
+        # Get EXIF tags to see if we have a "date taken"
+        created_date = datetime.datetime.fromtimestamp(folder_item.stat().st_ctime)
+        modified_date = datetime.datetime.fromtimestamp(folder_item.stat().st_mtime)
+        taken_date = self.exif_taken_date(folder_item)
+        if not taken_date:
+            if modified_date >= created_date:
+                self.logger.debug(f"Using Created Date: {created_date}")
+                return created_date
+            else:
+                self.logger.debug(f"Using Modified Date: {modified_date}")
+                return modified_date
+        # Date taken first, earliest of modified and created
+        else:
+            self.logger.debug(f"Using Taken Date: {taken_date}")
+            return taken_date
+
+    def exif_taken_date(self, folder_item):
+        # Get the "date taken" EXIF tag, if it exists
+        try:
+            exif_image = Image(folder_item)
+            taken_date_str = exif_image.datetime
+            taken_date = datetime.datetime.strptime(taken_date_str, '%Y:%m:%d %H:%M:%S')
+            self.logger.debug(f"Taken date: {taken_date}")
+        except:
+            taken_date = None
+        return taken_date
